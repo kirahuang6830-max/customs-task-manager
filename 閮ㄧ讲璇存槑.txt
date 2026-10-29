@@ -1,0 +1,24 @@
+天美清关任务管理 · 测试版
+
+【第一阶段：打开演示，不涉及真实客户资料】
+1. 解压 ZIP。文件包含 index.html、app.js、style.css、sw.js、manifest.webmanifest、icon.svg、supabase-schema.sql。
+2. 在你自己的 GitHub 账号中创建新的 PUBLIC 仓库，例如 customs-tasks-demo（不要覆盖之前的 customs-study 清关学习本）。
+3. 上传网站文件到仓库根目录；SQL 文件和本说明可以不上传（最好不要上传数据库配置或内部资料）。
+4. Settings > Pages > Deploy from a branch > main > /(root) > Save。
+5. 访问生成的 https://用户名.github.io/customs-tasks-demo/，先用模拟身份和虚构数据试用。演示模式只在当前浏览器中存储，不支持多人共享，也没有真实身份隔离。
+
+【第二阶段：连接真正的多人在线系统】
+1. 在 Supabase 创建你自己的测试项目（仅用虚构任务），开启邮箱密码 Auth，为管理员和测试员工分别创建账户。
+2. 打开 Supabase SQL Editor，执行 supabase-schema.sql。先做安全验证，再允许任何正式数据。
+3. 在 Authentication > Users 复制管理员 Auth 用户的 UUID，去 SQL Editor 执行：update public.profiles set role='admin' where id='管理员的UUID';
+4. 在 Supabase 项目设置/API 获取 Project URL 和 publishable/anon 公钥（绝不可用 service_role/secret 密钥），在网页“运行模式”中填写并使用测试账号登录。
+5. 分别用员工A、员工B账号测试：A无法查询B任务、不能编辑/删除/更换负责人；管理员能分配全部任务；更新状态会保存到云端，刷新后仍存在。
+6. 只有测试通过、获得公司同意、落实权限、备份、数据保留和运维责任后，才考虑正式上线。GitHub Pages 仓库为公开代码，不要上传客户附件、隐私数据或API服务端密钥。
+
+【当前版本的限制】
+- 四种任务：7501、DO、ISF、装箱单。
+- 测试版不含真实的阿里邮箱自动抓取、不发邮件、不自动提醒、不支持附件上传。
+- 演示模式的身份切换仅模拟显示，不是权限保护；演示数据仅保存在当前浏览器。
+- 云端模式需要用户自行建立 Supabase 项目、配置独立账号和执行SQL后才能真正同步。
+- 网页没有自动定时刷新，员工更新后管理员点击“刷新”可获取最新数据。
+- 系统主要用于任务调度，不替代美国清关行合规审核。
