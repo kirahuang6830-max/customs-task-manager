@@ -1,0 +1,31 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#204a58"><meta name="description" content="清关单证任务分配与进度管理测试版"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml"><title>天美清关任务管理·测试版</title><link rel="stylesheet" href="style.css"></head><body>
+<header><div class="shell bar"><div><small>TAIMEK · CLEARANCE TASKS</small><h1>清关任务管理 <span class="pill">测试版</span></h1></div><button id="modeBtn" class="outline small">运行模式</button></div></header>
+<main class="shell">
+<nav class="appTabs"><button id="tasksTab" class="primary" type="button">任务管理</button><button id="knowledgeTab" class="outline" type="button">共享知识库</button></nav>
+<section id="taskPanel">
+<div id="notice" class="notice">当前为演示模式：所有内容均为虚构数据，不代表真实账号权限，也不会在线同步。</div>
+<section class="summary"><div><strong id="nTotal">0</strong><span>当前可见任务</span></div><div><strong id="nDoing">0</strong><span>进行中</span></div><div><strong id="nReview">0</strong><span>待复核</span></div><div><strong id="nDone">0</strong><span>已回复</span></div></section>
+<section class="toolbar"><div class="group"><label for="demoRole">查看身份</label><select id="demoRole"><option value="admin">丽琪 · 管理员</option><option value="a">员工A</option><option value="b">员工B</option></select></div><div class="group"><label for="typeFilter">任务类型</label><select id="typeFilter"><option value="">全部类型</option><option>7501</option><option>DO</option><option>ISF</option><option>装箱单</option></select></div><div class="group grow"><label for="search">搜索</label><input id="search" placeholder="柜号、提单号、邮件主题"></div><button id="addBtn" class="primary">+ 新建任务</button><button id="archiveToggle" class="outline" style="display:none">查看已归档</button><button id="refreshBtn" class="outline">刷新</button></section>
+<section><div class="sectionhead"><h2 id="listTitle">全部任务</h2><span id="countLabel"></span></div><div id="taskList" class="tasks"></div></section>
+<section class="help"><h2>工作规则</h2><p>管理员根据老板群发邮件登记任务 → 指派员工 → 员工更新进度 → 完成单证并按流程复核 → 回复原邮件 → 标记“已回复”。同一柜号可以对应7501、DO、ISF、装箱单等不同任务。</p><p><b>保密提醒：</b>正式使用前必须由公司批准，并启用数据库行级权限。演示模式的角色切换仅用于展示界面，绝不能用于存储真实客户资料。</p></section>
+</section>
+<section id="knowledgePanel" hidden>
+  <div id="knowledgeNotice" class="notice">知识库只允许已登录的测试账号访问。待核实资料仅录入人和管理员可见。</div>
+  <section class="toolbar"><div class="group grow"><label for="knowledgeSearch">搜索客户名称、进口商编号、Surety Number</label><input id="knowledgeSearch" placeholder="输入关键词搜索"></div><button id="knowledgeAdd" class="primary" type="button">＋新增客户资料</button><button id="knowledgeRefresh" class="outline" type="button">刷新</button></section>
+  <div class="sectionhead"><h2>客户基础资料</h2><span id="knowledgeCount">0 条</span></div>
+  <div id="knowledgeList" class="tasks"></div>
+</section>
+</main>
+<dialog id="knowledgeDialog"><form id="knowledgeForm"><div class="dialogHead"><h2 id="knowledgeDialogTitle">新增客户资料</h2><button id="knowledgeClose" type="button" class="outline small">关闭</button></div>
+  <div class="fields">
+    <label class="full">客户名称 / Importer Name <input name="importer_name" required maxlength="200"></label>
+    <label>Importer Number<input name="importer_number" maxlength="100"></label>
+    <label>Surety Number<input name="surety_number" maxlength="100"></label>
+    <label>Bond 类型<select name="bond_type"><option value="">未填写</option><option>Continuous</option><option>Single Transaction</option><option>其他/待确认</option></select></label>
+    <label class="full">客户地址 / Importer Address<textarea name="importer_address" rows="2"></textarea></label>
+    <label class="full">备注与资料来源<textarea name="notes" rows="3" placeholder="说明信息来源和核实情况，不粘贴证件或敏感邮件正文"></textarea></label>
+    <label id="verificationField" class="full" hidden>核实状态<select name="verification_status"><option>待核实</option><option>已核实</option></select></label>
+  </div><p class="muted tiny">所有新客户资料默认待核实。管理员审核前不可作为正式申报依据。请只输入虚构测试资料。</p><div class="actions"><button class="primary" type="submit">保存资料</button></div></form></dialog>
+<dialog id="taskDialog"><form id="taskForm" method="dialog"><div class="dialogHead"><h2 id="dialogTitle">新建任务</h2><button type="button" id="closeDialog" class="outline small">关闭</button></div><div class="fields"><label>任务类型<select name="kind" required><option>7501</option><option>DO</option><option>ISF</option><option>装箱单</option></select></label><label>负责人<select name="assignee"><option value="">待分配</option><option value="a">员工A</option><option value="b">员工B</option></select></label><label>柜号<input name="container_no" placeholder="例如 DEMO1234567"></label><label>提单号<input name="bill_no" placeholder="例如 DEMO-BL-001"></label><label>截止时间<input type="datetime-local" name="due_at"></label><label>任务状态<select name="status"><option>待分配</option><option>待处理</option><option>处理中</option><option>待补资料</option><option>待复核</option><option>已回复</option></select></label><label class="full">邮件主题<input name="mail_subject" placeholder="只记录索引，不粘贴敏感邮件正文"></label><label class="full">备注<textarea name="notes" rows="3"></textarea></label></div><div class="actions"><button type="submit" class="primary">保存任务</button></div></form></dialog>
+<dialog id="configDialog"><div class="dialogHead"><h2>运行模式与云端连接</h2><button id="closeConfig" class="outline small">关闭</button></div><p>演示模式使用虚构数据，可先体验。多人在线同步需要配置你自己创建的 Supabase 项目，并执行随压缩包提供的安全数据库脚本。</p><div class="fields"><label class="full">Supabase Project URL<input id="sbUrl" placeholder="https://xxxx.supabase.co"></label><label class="full">Supabase publishable / anon key<input id="sbKey" placeholder="只填写公开客户端密钥，绝不可填写 service_role"></label><label class="full">登录邮箱<input id="loginEmail" type="email" placeholder="员工自己的邮箱"></label><label class="full">登录密码<input id="loginPassword" type="password" placeholder="Supabase Auth密码"></label></div><p id="authText" class="muted"></p><div class="actions"><button id="connectBtn" class="primary">连接并登录</button><button id="signoutBtn" class="outline">退出云端账号</button><button id="demoBtn" class="outline">返回演示模式</button></div><p class="muted tiny">注意：GitHub Pages 只是公开的前端文件。云端账号的真实权限由 Supabase 的 RLS 和服务器端函数控制。不要把客户资料放在演示模式或未完成权限验证的云端环境。</p></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script src="app.js"></script></body></html>
