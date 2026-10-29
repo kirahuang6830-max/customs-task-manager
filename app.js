@@ -16,5 +16,31 @@ let users=[];async function submitTask(){const f=$('taskForm'),obj=Object.fromEn
 async function loadRemote(){const r=await sb.from('tasks').select('id,kind,assignee,container_no,bill_no,due_at,status,mail_subject,notes,completed_at').order('created_at',{ascending:false});if(r.error)throw r.error;remote=r.data||[];if(profile?.role==='admin'){const p=await sb.from('profiles').select('id,display_name,role');if(!p.error)users=p.data||[];}}
 async function connect(){try{if(!window.supabase)throw Error('联网依赖未加载，请检查网络。');const url=$('sbUrl').value.trim(),key=$('sbKey').value.trim();if(!/^https:\/\/.+\.supabase\.co\/?$/.test(url))throw Error('请输入正确的Supabase项目地址');if(!key)throw Error('缺少客户端公开密钥');localStorage.setItem('ct_sb_config',JSON.stringify({url,key}));sb=window.supabase.createClient(url,key);const a=await sb.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(a.error)throw a.error;currentUser=a.data.user;const p=await sb.from('profiles').select('role,display_name').eq('id',currentUser.id).single();if(p.error)throw p.error;profile=p.data;mode='cloud';await loadRemote();$('configDialog').close();render();}catch(e){$('authText').textContent='连接失败：'+e.message;}}
 $('modeBtn').onclick=()=>$('configDialog').showModal();$('closeConfig').onclick=()=>$('configDialog').close();$('closeDialog').onclick=()=>$('taskDialog').close();$('demoRole').onchange=render;$('typeFilter').onchange=render;$('search').oninput=render;$('refreshBtn').onclick=async()=>{if(mode==='cloud')try{await loadRemote();}catch(e){alert(e.message)}render()};$('addBtn').onclick=()=>openTask();$('taskForm').onsubmit=async e=>{e.preventDefault();try{await submitTask()}catch(err){alert('保存失败：'+err.message)}};$('connectBtn').onclick=connect;$('demoBtn').onclick=()=>{mode='demo';profile=null;currentUser=null;$('configDialog').close();render()};$('signoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();mode='demo';profile=null;currentUser=null;$('authText').textContent='已退出云端';render()};
-const saved=JSON.parse(localStorage.getItem('ct_sb_config')||'null');if(saved){$('sbUrl').value=saved.url;$('sbKey').value=saved.key;}if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});render();
+async function restoreCloudSession(){
+  try{
+    const saved=JSON.parse(localStorage.getItem('ct_sb_config')||'null');
+    if(!saved?.url||!saved?.key||!window.supabase)return;
+    $('sbUrl').value=saved.url;
+    $('sbKey').value=saved.key;
+    sb=window.supabase.createClient(saved.url,saved.key);
+    const {data,error}=await sb.auth.getSession();
+    if(error)throw error;
+    if(!data.session?.user)return;
+    currentUser=data.session.user;
+    const p=await sb.from('profiles').select('role,display_name').eq('id',currentUser.id).single();
+    if(p.error)throw p.error;
+    profile=p.data;
+    mode='cloud';
+    await loadRemote();
+    render();
+  }catch(e){
+    console.error('Restore Supabase session failed:',e);
+    $('authText').textContent='恢复云端登录失败：'+e.message;
+    mode='demo';currentUser=null;profile=null;render();
+  }
+}
+try{const saved=JSON.parse(localStorage.getItem('ct_sb_config')||'null');if(saved){$('sbUrl').value=saved.url;$('sbKey').value=saved.key;}}catch(e){console.warn('Invalid saved cloud configuration',e);}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+render();
+restoreCloudSession();
 })();
