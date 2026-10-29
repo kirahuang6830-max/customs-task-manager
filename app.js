@@ -18,6 +18,96 @@ let users=[];async function submitTask(){const f=$('taskForm'),obj=Object.fromEn
 async function loadRemote(){const r=await sb.from('tasks').select('id,kind,assignee,container_no,bill_no,due_at,status,mail_subject,notes,completed_at,archived_at').order('created_at',{ascending:false});if(r.error)throw r.error;remote=r.data||[];if(profile?.role==='admin'){const p=await sb.from('profiles').select('id,display_name,role');if(!p.error)users=p.data||[];}}
 async function connect(){try{if(!window.supabase)throw Error('联网依赖未加载，请检查网络。');const url=$('sbUrl').value.trim(),key=$('sbKey').value.trim();if(!/^https:\/\/.+\.supabase\.co\/?$/.test(url))throw Error('请输入正确的Supabase项目地址');if(!key)throw Error('缺少客户端公开密钥');localStorage.setItem('ct_sb_config',JSON.stringify({url,key}));sb=window.supabase.createClient(url,key);const a=await sb.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});if(a.error)throw a.error;currentUser=a.data.user;const p=await sb.from('profiles').select('role,display_name').eq('id',currentUser.id).single();if(p.error)throw p.error;profile=p.data;mode='cloud';await loadRemote();$('configDialog').close();render();}catch(e){$('authText').textContent='连接失败：'+e.message;}}
 $('modeBtn').onclick=()=>$('configDialog').showModal();$('closeConfig').onclick=()=>$('configDialog').close();$('closeDialog').onclick=()=>$('taskDialog').close();$('demoRole').onchange=render;$('typeFilter').onchange=render;$('search').oninput=render;$('refreshBtn').onclick=async()=>{if(mode==='cloud')try{await loadRemote();}catch(e){alert(e.message)}render()};$('addBtn').onclick=()=>openTask();$('archiveToggle').onclick=()=>{showingArchived=!showingArchived;render()};$('taskForm').onsubmit=async e=>{e.preventDefault();try{await submitTask()}catch(err){alert('保存失败：'+err.message)}};$('connectBtn').onclick=connect;$('demoBtn').onclick=()=>{mode='demo';profile=null;currentUser=null;$('configDialog').close();render()};$('signoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();mode='demo';profile=null;currentUser=null;$('authText').textContent='已退出云端';render()};
+
+let activePanel='tasks', knowledgeItems=[], knowledgeEditId=null;
+function setPanel(panel){
+  activePanel=panel;
+  $('taskPanel').hidden=panel!=='tasks';
+  $('knowledgePanel').hidden=panel!=='knowledge';
+  $('tasksTab').className=panel==='tasks'?'primary':'outline';
+  $('knowledgeTab').className=panel==='knowledge'?'primary':'outline';
+  if(panel==='knowledge')refreshKnowledge();
+}
+async function refreshKnowledge(){
+  if(mode!=='cloud'||!sb||!currentUser){
+    $('knowledgeNotice').textContent='请先在运行模式中使用测试账号登录云端。演示模式不保存客户资料。';
+    knowledgeItems=[];renderKnowledge();return;
+  }
+  try{
+    const {data,error}=await sb.from('customer_knowledge')
+      .select('id,importer_name,importer_number,surety_number,bond_type,importer_address,notes,verification_status,created_by,created_at,verified_at')
+      .order('created_at',{ascending:false}).limit(500);
+    if(error)throw error;
+    knowledgeItems=data||[];
+    $('knowledgeNotice').textContent='云端知识库：新资料默认待核实；员工仅能看到已核实资料及自己录入的待核实资料。';
+    renderKnowledge();
+  }catch(e){
+    $('knowledgeNotice').textContent='知识库读取失败：'+e.message;
+    knowledgeItems=[];renderKnowledge();
+  }
+}
+function renderKnowledge(){
+  const q=$('knowledgeSearch').value.trim().toLowerCase();
+  const items=knowledgeItems.filter(x=>[x.importer_name,x.importer_number,x.surety_number].some(v=>String(v||'').toLowerCase().includes(q)));
+  $('knowledgeCount').textContent=items.length+' 条';
+  const admin=mode==='cloud'&&profile?.role==='admin';
+  $('knowledgeAdd').style.display=mode==='cloud'?'':'none';
+  $('knowledgeList').innerHTML=items.map(x=>`
+  <article class="task">
+    <div class="topline"><strong>${escape(x.importer_name)}</strong><span class="status">${escape(x.verification_status)}</span></div>
+    <div class="meta"><span>Importer Number：${escape(x.importer_number||'未填写')}</span><span>Surety Number：${escape(x.surety_number||'未填写')}</span><span>Bond：${escape(x.bond_type||'未填写')}</span></div>
+    <p>地址：${escape(x.importer_address||'未填写')}</p>
+    <p>备注：${escape(x.notes||'无')}</p>
+    ${admin?`<div class="foot"><button class="outline" type="button" data-knowledge-edit="${escape(x.id)}">编辑 / 审核</button></div>`:''}
+  </article>`).join('')||'<div class="empty">暂无符合条件的客户资料</div>';
+  $('knowledgeList').querySelectorAll('[data-knowledge-edit]').forEach(b=>b.onclick=()=>openKnowledge(b.dataset.knowledgeEdit));
+}
+function openKnowledge(id=null){
+  if(mode!=='cloud'||!currentUser){alert('请先登录云端测试账号');return;}
+  if(id&&profile?.role!=='admin')return;
+  knowledgeEditId=id;
+  const x=knowledgeItems.find(v=>v.id===id)||{};
+  const form=$('knowledgeForm');
+  for(const key of ['importer_name','importer_number','surety_number','bond_type','importer_address','notes','verification_status']){
+    if(form.elements[key])form.elements[key].value=x[key]|| (key==='verification_status'?'待核实':'');
+  }
+  $('verificationField').hidden=!(id&&profile?.role==='admin');
+  $('knowledgeDialogTitle').textContent=id?'编辑 / 审核客户资料':'新增客户资料';
+  $('knowledgeDialog').showModal();
+}
+async function submitKnowledge(e){
+  e.preventDefault();
+  const form=$('knowledgeForm'),fd=new FormData(form);
+  const obj={};
+  for(const key of ['importer_name','importer_number','surety_number','bond_type','importer_address','notes'])obj[key]=String(fd.get(key)||'').trim();
+  if(!obj.importer_name){alert('请填写客户名称');return;}
+  try{
+    let result;
+    if(knowledgeEditId){
+      if(profile?.role!=='admin')throw Error('无管理员权限');
+      obj.verification_status=String(fd.get('verification_status')||'待核实');
+      obj.verified_by=obj.verification_status==='已核实'?currentUser.id:null;
+      obj.verified_at=obj.verification_status==='已核实'?new Date().toISOString():null;
+      obj.updated_at=new Date().toISOString();
+      result=await sb.from('customer_knowledge').update(obj).eq('id',knowledgeEditId);
+    }else{
+      obj.created_by=currentUser.id;
+      obj.verification_status='待核实';
+      result=await sb.from('customer_knowledge').insert(obj);
+    }
+    if(result.error)throw result.error;
+    $('knowledgeDialog').close();
+    await refreshKnowledge();
+  }catch(err){alert('保存客户资料失败：'+err.message);}
+}
+$('tasksTab').onclick=()=>setPanel('tasks');
+$('knowledgeTab').onclick=()=>setPanel('knowledge');
+$('knowledgeSearch').oninput=renderKnowledge;
+$('knowledgeRefresh').onclick=refreshKnowledge;
+$('knowledgeAdd').onclick=()=>openKnowledge();
+$('knowledgeClose').onclick=()=>$('knowledgeDialog').close();
+$('knowledgeForm').onsubmit=submitKnowledge;
+
 async function restoreCloudSession(){
   try{
     const saved=JSON.parse(localStorage.getItem('ct_sb_config')||'null');
